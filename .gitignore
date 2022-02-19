@@ -22,3 +22,11 @@ docs/
 
 # Code coverage
 *.lst
+
+# Binary
+bin/
+
+# VSCode
+
+# Test
+test/

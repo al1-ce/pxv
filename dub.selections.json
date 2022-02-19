@@ -1,0 +1,8 @@
+{
+	"fileVersion": 1,
+	"versions": {
+		"dlib": "0.23.0",
+		"dmagick": "0.2.4",
+		"vfile": "0.1.2"
+	}
+}
