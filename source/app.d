@@ -9,6 +9,7 @@ import std.range;
 import std.traits: isPointer;
 import core.sys.posix.sys.ioctl;
 import modules.color;
+import modules.vector: Vector2;
 import dlib.image;
 
 // Color lib ref: https://github.com/yamadapc/d-colorize/
@@ -26,6 +27,11 @@ const string helpString = `Usage: cascii [args] image-file
     -p, --palette           sets ascii palette for output, doesnt work with -f
     -b, --background        enables background colors
 `;
+
+alias fFloor = (T) => floor(to!float(T));
+alias fFloorToInt = (T) => to!int(floor(to!float(T)));
+alias fClamp = (T, M, A) => clamp(to!float(T), to!float(M), to!float(A));
+alias fClampToInt = (T, M, A) => to!int(clamp(to!float(T), to!float(M), to!float(A)));
 
 /* 
  * Return states 
@@ -94,16 +100,45 @@ int main(string[] args) {
 
     for (int y = 0; y < terminalHeight; ++y) {
         for (int x = 0; x < terminalWidth; ++x) {
-            int xpos = to!int(clamp(floor(to!float(x * rate)), 0, width));
-            int ypos = to!int(clamp(floor(to!float(y * rate * yfix)), 0, height));
-            auto pix = img.opIndex(xpos, ypos);
-            writef(" %s", getColTokenBack(new DColor(pix.r, pix.g, pix.b)));
+            int xpos = fClampToInt(fFloor(x * rate), 0, width);
+            int ypos = fClampToInt(fFloor(y * rate * yfix), 0, height);
+            int wpos = fClampToInt(fFloor(x + 1) * rate, 0, width) - xpos;
+            int hpos = fClampToInt(fFloor(y + 1) * rate * yfix, 0, height) - ypos;
+            
+            auto pix = img.opIndex(fFloorToInt(xpos + wpos / 2), fFloorToInt(ypos + hpos / 2));
+            Color mainCol = new Color(pix.r, pix.g, pix.b);
+            Color avgCol = getAvgColor(img, new Vector2(xpos, ypos), new Vector2(wpos, hpos));
+            writef("%s%s%s", getColTokenBack(avgCol), getColToken(mainCol), getChar(mainCol));
         }
         writeln(eolColToken);
     }
 
     // success
     return 0;
+}
+
+Color getAvgColor(SuperImage img, Vector2 stPos, Vector2 whPos) {
+    Color col = Color.WHITE;
+
+    for (int y = stPos.y; y < stPos.y + whPos.y; ++y) {
+        for (int x = stPos.x; x < stPos.x + whPos.x; ++x) {
+            auto pix = img.opIndex(x, y);
+            Color c = new Color(pix.r, pix.g, pix.b);
+            col.r += c.r;
+            col.g += c.g;
+            col.b += c.b;
+        }
+    }
+
+    col.r /= whPos.x * whPos.y;
+    col.g /= whPos.x * whPos.y;
+    col.b /= whPos.x * whPos.y;
+    
+    return col.clamped();
+}
+
+string getChar(Color col) {
+    return "X";
 }
 
 string getColToken8(string ansi) {
@@ -114,7 +149,7 @@ string getColToken(string ansi) {
     return format("\033[38;5;%sm", ansi);
 }
 
-string getColToken(DColor col) {
+string getColToken(Color col) {
     return format("\033[38;2;%s;%s;%sm", 
                     to!string(floor(col.r * 255)), 
                     to!string(floor(col.g * 255)), 
@@ -125,7 +160,7 @@ string getColTokenBack(string ansi) {
     return format("\033[48;5;%sm", ansi);
 }
 
-string getColTokenBack(DColor col) {
+string getColTokenBack(Color col) {
     return format("\033[48;2;%s;%s;%sm", 
                     to!string(floor(col.r * 255)), 
                     to!string(floor(col.g * 255)), 

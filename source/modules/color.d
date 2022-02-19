@@ -3,55 +3,63 @@ module modules.color;
 import std.regex: regex, matchAll;
 import std.conv: to;
 import std.math: floor;
+import std.algorithm: canFind, startsWith, find, countUntil, clamp, max, min;
 
-class DColor {
+class Color {
+    alias fClamp = (T, M, A) => clamp(to!float(T), to!float(M), to!float(A));
 
     float r;
     float g;
     float b;
     float a;
 
+    alias BLACK = () => new Color(0, 0, 0, 1f);
+    alias WHITE = () => new Color(1f, 1f, 1f, 1f);
+    alias RED = () => new Color(1.0, 0, 0, 1.0);
+    alias GREEN = () => new Color(0, 1f, 0, 1f);
+    alias BLUE = () => new Color(0, 0, 1f, 1f);
+    alias TRANSPARENT = () => new Color(0, 0, 0, 0);
 
     static const string[] LOWRGB = [
     "#000000", "#800000", "#008000", "#808000", "#000080", "#800080", "#008080", "#c0c0c0",
     "#808080", "#ff0000", "#00ff00", "#ffff00", "#0000ff", "#ff00ff", "#00ffff", "#ffffff"
     ];
 
-    this(float r, float g, float b, float a) {
+    this() {
+        this(0, 0, 0, 0);
+    }
+
+    this(float r, float g, float b, float a = 1) {
         this.r = r;
         this.g = g;
         this.b = b;
         this.a = a;
     }
 
-    this(float r, float g, float b) {
-        this(r, g, b, 1);
-    }
-
     this(int r, int g, int b, int a) {
-        this.r = to!float(r / 255.0);
-        this.g = to!float(g / 255.0);
-        this.b = to!float(b / 255.0);
-        this.b = to!float(b / 255.0);
+        this.r = to!float(r / 255f);
+        this.g = to!float(g / 255f);
+        this.b = to!float(b / 255f);
+        this.b = to!float(b / 255f);
     }
 
     this(int r, int g, int b) {
         this(r, g, b, 255);
     }
 
-    static DColor getFromAnsi8(int ansi, bool isBackground) {
+    static Color getFromAnsi8(int ansi, bool isBackground) {
         // TODO
         // probably just get from array
-        return new DColor(0, 0, 0);
+        return new Color(0, 0, 0);
     }
 
-    static DColor getFromAnsi(int ansi) {
-        if (ansi < 0 || ansi > 255) return new DColor(0, 0, 0);
-        if (ansi < 16) return DColor.getFromHex(DColor.LOWRGB[ansi]);
+    static Color getFromAnsi(int ansi) {
+        if (ansi < 0 || ansi > 255) return new Color(0, 0, 0);
+        if (ansi < 16) return Color.getFromHex(Color.LOWRGB[ansi]);
 
         if (ansi > 231) {
             const int s = (ansi - 232) * 10 + 8;
-            return new DColor(s, s, s);
+            return new Color(s, s, s);
         }
 
         const int n = ansi - 16;
@@ -62,17 +70,17 @@ class DColor {
         _r = _r ? _r * 40 + 55 : 0;
         _g = _g ? _g * 40 + 55 : 0;
 
-        return new DColor(_r / 255.0, _g / 255.0, _b / 255.0);
+        return new Color(_r / 255.0, _g / 255.0, _b / 255.0);
     }
 
-    static DColor getFromHex(string hex) {
+    static Color getFromHex(string hex) {
         auto rg = regex(r"/^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i");
         auto m = matchAll(hex, rg);
         m.popFront();
         float _r = to!int(m.front.hit, 16) / 255; m.popFront();
         float _g = to!int(m.front.hit, 16) / 255; m.popFront();
         float _b = to!int(m.front.hit, 16) / 255; m.popFront();
-        return new DColor(to!float(_r), to!float(_g), to!float(_b));
+        return new Color(to!float(_r), to!float(_g), to!float(_b));
     }
 
     int getAnsi8(bool isBackground) {
@@ -118,5 +126,12 @@ class DColor {
 
     float getLuma() {
         return (0.2126 * this.r + 0.7152 * this.g + 0.0722 * this.b);
+    }
+
+    Color clamped() {
+        this.r = fClamp(this.r, 0, 1);
+        this.g = fClamp(this.g, 0, 1);
+        this.b = fClamp(this.b, 0, 1);
+        return this;
     }
 }
