@@ -10,7 +10,7 @@
             "name": "Debug D project",
             "cwd": "${workspaceFolder}",
             "program": "./bin/craftascii",
-            "preLaunchTask": "dub: Build craftascii",
+            "preLaunchTask": "fbuild",
             "args": ["~/git/craftascii/test/gits_sitting.jpg"]
         }
     ]

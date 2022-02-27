@@ -1,8 +1,8 @@
 module modules.vector;
 
-class Vector2 {
-    int x;
-    int y;
+class Vector2(T) {
+    T x;
+    T y;
 
     alias ZERO = () => new Vector2(0, 0);
     alias ONE = () => new Vector2(1, 1);
@@ -12,7 +12,7 @@ class Vector2 {
     alias RIGHT = () => new Vector2(1, 0);
     alias DOWN = () => new Vector2(0, -1);
 
-    this(int x, int y) {
+    this(T x, T y) {
         this.x = x;
         this.y = y;
     }
@@ -22,7 +22,5 @@ class Vector2 {
     }
 }
 
-class Vector2F {
-    int x;
-    int y;
-}
+alias Vector2f = Vector2!float;
+alias Vector2i = Vector2!int;

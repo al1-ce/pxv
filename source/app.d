@@ -9,7 +9,7 @@ import std.range;
 import std.traits: isPointer;
 import core.sys.posix.sys.ioctl;
 import modules.color;
-import modules.vector: Vector2;
+import modules.vector: Vector2i;
 import dlib.image;
 
 // Color lib ref: https://github.com/yamadapc/d-colorize/
@@ -28,10 +28,12 @@ const string helpString = `Usage: cascii [args] image-file
     -b, --background        enables background colors
 `;
 
+const string brightChars = r" .`^,:;!-~=+<>[]{}*JS?#%@AX";
+
 alias fFloor = (T) => floor(to!float(T));
-alias fFloorToInt = (T) => to!int(floor(to!float(T)));
+alias fFloorToInt = (T) => to!int(fFloor(T));
 alias fClamp = (T, M, A) => clamp(to!float(T), to!float(M), to!float(A));
-alias fClampToInt = (T, M, A) => to!int(clamp(to!float(T), to!float(M), to!float(A)));
+alias fClampToInt = (T, M, A) => to!int(fClamp(T, M, A));
 
 /* 
  * Return states 
@@ -47,7 +49,7 @@ int main(string[] args) {
     }
 
     // checking filepath
-    string filepath = args[args.length - 1];
+    string filepath = args[to!int(args.length) - 1];
 
     if (startsWith(filepath, '-') > 0) {
         writeln("Missing image path");
@@ -79,13 +81,13 @@ int main(string[] args) {
         int w1idx = to!int(countUntil(args, ["-w"]));
         int w2idx = to!int(countUntil(args, ["--width"]));
         if (w1idx != -1) {
-            string arg = args[min(w1idx + 1, args.length - 1)];
+            string arg = args[min(w1idx + 1, to!int(args.length) - 1)];
             if (isNumeric(arg)) {
                 terminalWidth = to!int(to!int(arg));
             }
         }
         if (w2idx != -1) {
-            string arg = args[min(w2idx + 1, args.length - 1)];
+            string arg = args[min(w2idx + 1, to!int(args.length) - 1)];
             if (isNumeric(arg)) {
                 terminalWidth = to!int(to!int(arg));
             }
@@ -107,7 +109,7 @@ int main(string[] args) {
             
             auto pix = img.opIndex(fFloorToInt(xpos + wpos / 2), fFloorToInt(ypos + hpos / 2));
             Color mainCol = new Color(pix.r, pix.g, pix.b);
-            Color avgCol = getAvgColor(img, new Vector2(xpos, ypos), new Vector2(wpos, hpos));
+            Color avgCol = getAvgColor(img, new Vector2i(xpos, ypos), new Vector2i(wpos, hpos));
             writef("%s%s%s", getColTokenBack(avgCol), getColToken(mainCol), getChar(mainCol));
         }
         writeln(eolColToken);
@@ -117,7 +119,7 @@ int main(string[] args) {
     return 0;
 }
 
-Color getAvgColor(SuperImage img, Vector2 stPos, Vector2 whPos) {
+Color getAvgColor(SuperImage img, Vector2i stPos, Vector2i whPos) {
     Color col = Color.WHITE;
 
     for (int y = stPos.y; y < stPos.y + whPos.y; ++y) {
@@ -137,8 +139,10 @@ Color getAvgColor(SuperImage img, Vector2 stPos, Vector2 whPos) {
     return col.clamped();
 }
 
-string getChar(Color col) {
-    return "X";
+char getChar(Color col) {
+    // int p = fFloorToInt((1 - col.getLuma()) * (to!int(brightChars.length) - 1));
+    int p = fFloorToInt((col.getLuma()) * (to!int(brightChars.length) - 1));
+    return brightChars[p];
 }
 
 string getColToken8(string ansi) {

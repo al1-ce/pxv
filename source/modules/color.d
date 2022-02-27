@@ -6,7 +6,7 @@ import std.math: floor;
 import std.algorithm: canFind, startsWith, find, countUntil, clamp, max, min;
 
 class Color {
-    alias fClamp = (T, M, A) => clamp(to!float(T), to!float(M), to!float(A));
+    private alias fClamp = (T, M, A) => clamp(to!float(T), to!float(M), to!float(A));
 
     float r;
     float g;

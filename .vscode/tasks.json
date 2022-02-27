@@ -12,8 +12,11 @@
             "problemMatcher": [
                 "$dmd"
             ],
-            "group": "build",
-            "label": "dub: Build craftascii",
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "label": "fbuild",
             "detail": "dub build --compiler=dmd -a=x86_64 -b=debug -c=application"
         }
     ]
