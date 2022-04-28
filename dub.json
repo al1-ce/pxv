@@ -4,7 +4,7 @@
 	],
 	"copyright": "Copyright © 2022, Alisa Lain",
 	"dependencies": {
-		"dlib": "~>0.23.0"
+		"dlib": "~>1.0.0"
 	},
 	"description": "CLI tool for converting image to ascii",
 	"license": "GPL-3.0",

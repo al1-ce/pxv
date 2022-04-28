@@ -77,23 +77,19 @@ int main(string[] args) {
     winsize w;
     ioctl(0, TIOCGWINSZ, &w);
     int terminalWidth = w.ws_col;
-    if (args.canFind("-w") || args.canFind("--width")) {
-        int w1idx = to!int(countUntil(args, ["-w"]));
-        int w2idx = to!int(countUntil(args, ["--width"]));
-        if (w1idx != -1) {
-            string arg = args[min(w1idx + 1, to!int(args.length) - 1)];
-            if (isNumeric(arg)) {
-                terminalWidth = to!int(to!int(arg));
-            }
-        }
-        if (w2idx != -1) {
-            string arg = args[min(w2idx + 1, to!int(args.length) - 1)];
-            if (isNumeric(arg)) {
-                terminalWidth = to!int(to!int(arg));
-            }
-        }
+
+    /*****************************************
+    *              CLAMP VALUE              *
+    *          CHECK FOR ALL ARGS           *
+    * WRITE ADDITIONAL FUNCTION TO EASE USE *
+    *             MAYBE MODULE?             *
+    *****************************************/
+
+    string wid = findArgument(args, ["-w", "--width"], (s) => isNumeric(s));
+    if (wid != "") {
+        terminalWidth = to!int(wid);
     }
-    terminalWidth = min(terminalWidth, w.ws_col);
+    terminalWidth = max(min(terminalWidth, w.ws_col), 0);
 
 
     const float yfix = 1.75;
@@ -169,4 +165,22 @@ string getColTokenBack(Color col) {
                     to!string(floor(col.r * 255)), 
                     to!string(floor(col.g * 255)), 
                     to!string(floor(col.b * 255)));
+}
+
+string findArgument(string[] args, string[] pattern, 
+                    bool delegate(string strIn) typeCheck = (s) => true ) {
+    // typecheck is to check if arg is valid
+    foreach (key; pattern) {
+        if (args.canFind(key)) {
+            int idx = to!int(countUntil(args, ["-w"]));
+            if (idx != -1) {
+                string arg = args[min(idx + 1, to!int(args.length) - 1)];
+                if (typeCheck(arg)) {
+                    return arg;
+                }
+            }
+        }
+    }
+    return "";
+    
 }
