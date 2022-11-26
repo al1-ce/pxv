@@ -1,39 +1,38 @@
-import std.stdio: write, writef, writefln, writeln, File;
+import std.algorithm : canFind, clamp, countUntil, find, max, min, startsWith;
+import std.conv : to;
 import std.file;
-import std.format: format;
-import std.string: isNumeric;
-import std.conv: to;
-import std.math: floor;
-import std.algorithm: canFind, startsWith, find, countUntil, clamp, max, min;
+import std.format : format;
+import std.getopt;
+import std.math : floor;
 import std.range;
-import std.traits: isPointer;
+import std.stdio : File, write, writef, writefln, writeln;
+import std.string : isNumeric;
+import std.traits : isPointer;
+import std.array: popFront, join, split;
+import std.path: buildNormalizedPath, absolutePath, expandTilde;
+
 import core.sys.posix.sys.ioctl;
-import modules.color;
-import modules.vector: Vector2i;
+
 import dlib.image;
+
+import sily;
+
+import modules.color;
+import modules.vector : Vector2i;
 
 // Color lib ref: https://github.com/yamadapc/d-colorize/
 // DLib link: https://code.dlang.org/packages/dlib
 
 const string eolColToken = "\033[0m";
-const string helpString = `Usage: cascii [args] image-file
 
-    -h, --help              displays this message
-    -w, --width             sets width/colums. Terminal width by default
-    -g, --grayscale         sets grayscale
-    -t, --truecolor         enables truecolor
-    -r, --restrict          restricted 8/16bit palette
-    -f, --fancy             mimics image as much as possible
-    -p, --palette           sets ascii palette for output, doesnt work with -f
-    -b, --background        enables background colors
-`;
-
-const string brightChars = r" .`^,:;!-~=+<>[]{}*JS?#%@AX";
+string brightChars = r" .`^,:;!-~=+<>[]{}*JS?#%@AX";
 
 alias fFloor = (T) => floor(to!float(T));
 alias fFloorToInt = (T) => to!int(fFloor(T));
 alias fClamp = (T, M, A) => clamp(to!float(T), to!float(M), to!float(A));
 alias fClampToInt = (T, M, A) => to!int(fClamp(T, M, A));
+
+string fixPath(string path) { return path.buildNormalizedPath.expandTilde.absolutePath; } 
 
 /* 
  * Return states 
@@ -42,19 +41,42 @@ alias fClampToInt = (T, M, A) => to!int(fClamp(T, M, A));
  * 2 - Image loading exceptions
  */
 int main(string[] args) {
+
+    int cwidth = 0;
+    bool cgray = false;
+    bool ctruecolor = false;
+    bool crestrict = false;
+    bool cfancy = false;
+    string cpalette = "";
+    // bool cbackground;
+
+    auto help = getopt(
+        args,
+        config.bundling, config.passThrough,
+        "width|w", "Sets width/columns", &cwidth,
+        "grayscale|g", "Sets grayscale", &cgray,
+        "truecolor|t", "Enables truecolor", &ctruecolor,
+        "restrict|r", "Restricts to 8/16bit palette", &crestrict,
+        "fancy|f", "Mimics image as much as possible", &cfancy,
+        "palette|p", "Sets ascii palette for output", &cpalette,
+        // "background|b", "Enables background colors", &cbackground
+    );
+
     // help routine
-    if (args.canFind("-h") || args.canFind("--help") || args.length == 1) {
-        writeln(helpString);
+    if (help.helpWanted || args.length == 1) {
+        printGetopt(
+            "Usage: cascii [args] image-file",
+            "Options",
+            help.options
+        );
         return 0;
     }
 
-    // checking filepath
-    string filepath = args[to!int(args.length) - 1];
+    string[] opts = args.dup;
+    opts.popFront();
 
-    if (startsWith(filepath, '-') > 0) {
-        writeln("Missing image path");
-        return 1;
-    }
+    // checking filepath
+    string filepath = opts.join.fixPath;
 
     if (!filepath.exists()) {
         writeln("No such file");
@@ -73,23 +95,18 @@ int main(string[] args) {
     int width = img.width;
     int height = img.height;
 
-    // arguments
     winsize w;
     ioctl(0, TIOCGWINSZ, &w);
     int terminalWidth = w.ws_col;
 
-    /*****************************************
-    *              CLAMP VALUE              *
-    *          CHECK FOR ALL ARGS           *
-    * WRITE ADDITIONAL FUNCTION TO EASE USE *
-    *             MAYBE MODULE?             *
-    *****************************************/
-
-    string wid = findArgument(args, ["-w", "--width"], (s) => isNumeric(s));
-    if (wid != "") {
-        terminalWidth = to!int(wid);
+    if (cwidth != 0) {
+        terminalWidth = cwidth;
     }
     terminalWidth = max(min(terminalWidth, w.ws_col), 0);
+
+    if (cpalette != "") {
+        brightChars = cpalette;
+    }
 
 
     const float yfix = 1.75;
@@ -165,22 +182,4 @@ string getColTokenBack(Color col) {
                     to!string(floor(col.r * 255)), 
                     to!string(floor(col.g * 255)), 
                     to!string(floor(col.b * 255)));
-}
-
-string findArgument(string[] args, string[] pattern, 
-                    bool delegate(string strIn) typeCheck = (s) => true ) {
-    // typecheck is to check if arg is valid
-    foreach (key; pattern) {
-        if (args.canFind(key)) {
-            int idx = to!int(countUntil(args, ["-w"]));
-            if (idx != -1) {
-                string arg = args[min(idx + 1, to!int(args.length) - 1)];
-                if (typeCheck(arg)) {
-                    return arg;
-                }
-            }
-        }
-    }
-    return "";
-    
 }

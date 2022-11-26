@@ -4,10 +4,15 @@
 	],
 	"copyright": "Copyright © 2022, Alisa Lain",
 	"dependencies": {
-		"dlib": "~>1.0.0"
+		"dlib": "~>1.1.0",
+		"sily": "~master"
 	},
-	"description": "CLI tool for converting image to ascii",
+	"description": "cli image printer",
 	"license": "GPL-3.0",
 	"name": "craftascii",
-	"targetPath": "./bin/"
+	"sourcePaths": [
+		"src"
+	],
+	"targetPath": "./bin/",
+	"targetType": "executable"
 }
