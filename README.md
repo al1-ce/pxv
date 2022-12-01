@@ -1,11 +1,11 @@
 # pxv
 Instant feature rich terminal image viewer (as fast as [catimg](https://github.com/posva/catimg), if not faster).
 
-[![aur](https://img.shields.io/aur/version/pxv.svg?logo=archlinux&style=flat-square&logoColor=white)](https://aur.archlinux.org/packages/pxv) 
-[![dub](https://img.shields.io/dub/v/pxv.svg?logo=d&style=flat-square)](https://code.dlang.org/packages/pxv) 
+[![AUR version](https://img.shields.io/aur/version/pxv?logo=archlinux&logoColor=white&style=flat-square)](https://aur.archlinux.org/packages/pxv) 
+[![dub](https://img.shields.io/dub/v/pxv?logo=d&style=flat-square)](https://code.dlang.org/packages/pxv) 
 [![git](https://img.shields.io/github/v/release/al1-ce/pxv?label=git&logo=github&style=flat-square)](https://github.com/al1-ce/pxv)
-![license](https://img.shields.io/aur/license/pxv.svg?style=flat-square)
-![aur votes](https://img.shields.io/aur/votes/pxv.svg?style=flat-square) 
+![license](https://img.shields.io/aur/license/pxv?style=flat-square)
+![aur votes](https://img.shields.io/aur/votes/pxv?style=flat-square) 
 ![dub rating](https://badgen.net/dub/rating/pxv?style=flat)
 ![git stars](https://badgen.net/github/stars/al1-ce/pxv?style=flat)
 ![status](https://img.shields.io/badge/status-⠀-success?style=flat-square)
