@@ -1,7 +1,6 @@
 {
 	"fileVersion": 1,
 	"versions": {
-		"dlib": "1.1.0",
-		"sily": "~master"
+		"sily": "1.2.0"
 	}
 }

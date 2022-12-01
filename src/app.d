@@ -11,21 +11,23 @@ import std.traits : isPointer;
 import std.array: popFront, join, split;
 import std.path: buildNormalizedPath, absolutePath, expandTilde;
 
-import core.sys.posix.sys.ioctl;
+import stb.image: STBImage = Image;
+import stb.image: Pixel = Color;
 
-import dlib.image;
+import sily.color;
+import sily.bashfmt;
+import sily.getopt;
+import sily.vector: vec2i;
+import sily.terminal;
 
-import sily;
-
-import modules.color;
-import modules.vector : Vector2i;
-
-// Color lib ref: https://github.com/yamadapc/d-colorize/
-// DLib link: https://code.dlang.org/packages/dlib
+// cls && /g/pxv/bin/pxv ~/Pictures/20407219.png ~/Pictures/roofline-girl-1s-3840x2400.jpg ~/Pictures/anime-wallpaper.jpg
+// cls && ./bin/pxv ~/Pictures/20407219.png 
 
 const string eolColToken = "\033[0m";
 
-string brightChars = r" .`^,:;!-~=+<>[]{}*JS?#%@AX";
+string brightChars = r" .`^,:;!-~=+<>[]{}*JS?AX#%@";
+
+const int alphaThreshold = 64;
 
 alias fFloor = (T) => floor(to!float(T));
 alias fFloorToInt = (T) => to!int(fFloor(T));
@@ -34,152 +36,387 @@ alias fClampToInt = (T, M, A) => to!int(fClamp(T, M, A));
 
 string fixPath(string path) { return path.buildNormalizedPath.expandTilde.absolutePath; } 
 
-/* 
- * Return states 
- * 0 - success
- * 1 - Incorrect arguments
- * 2 - Image loading exceptions
- */
+string upperBlock = "\u2580";
+string lowerBlock = "\u2584";
+
+enum MatchSize {
+    width, height, fit
+}
+
+enum ColorType {
+    ansi8, ansi256, truecolor
+}
+
+struct Config {
+    int width = 0;
+    int height = 0;
+    MatchSize size = MatchSize.width;
+    ColorType color = ColorType.ansi256;
+    bool grayscale = false;
+    bool lowres = false;
+    bool useAscii = false;
+    string asciiPalette = "";
+    bool hideBackground = false;
+    bool useUnicode = false;
+
+}
+
+private Config conf;
+
 int main(string[] args) {
 
-    int cwidth = 0;
-    bool cgray = false;
-    bool ctruecolor = false;
-    bool crestrict = false;
-    bool cfancy = false;
-    string cpalette = "";
-    // bool cbackground;
+    GetoptResult help;
+    try {
+        help = getopt(
+            args,
+            config.bundling, config.passThrough, std.getopt.config.caseSensitive,
+            "columns|c", "Sets width/columns", &conf.width,
+            "rows|r", "Sets height/rows", &conf.height,
+            "size|s", "Matches size. Must be \'width\', \'height\' or \'fit\'", &conf.size,
 
-    auto help = getopt(
-        args,
-        config.bundling, config.passThrough,
-        "width|w", "Sets width/columns", &cwidth,
-        "grayscale|g", "Sets grayscale", &cgray,
-        "truecolor|t", "Enables truecolor", &ctruecolor,
-        "restrict|r", "Restricts to 8/16bit palette", &crestrict,
-        "fancy|f", "Mimics image as much as possible", &cfancy,
-        "palette|p", "Sets ascii palette for output", &cpalette,
-        // "background|b", "Enables background colors", &cbackground
-    );
+            "color|C", "Sets color type. Must be \'ansi8\', \'ansi256\', \'truecolor\'", &conf.color,
+            "grayscale|g", "Renders image in grayscale", &conf.grayscale,
+            "lowres|l", "Renders image in half of resolution", &conf.lowres,
+            
+            "ascii|i", "Uses ascii palette", &conf.useAscii,
+            "palette|p", "Sets ascii palette for output", &conf.asciiPalette,
+            "background|b", "Disables background", &conf.hideBackground,
+            "unicode|u", "Uses unicode to mimic image as much as possible", &conf.useUnicode,
+        );
+    } catch (Exception e) {
+        writeln(e.msg);
+        return 1;
+    }
 
     // help routine
+    uint _opt = 0;
     if (help.helpWanted || args.length == 1) {
         printGetopt(
-            "Usage: cascii [args] image-file",
-            "Options",
-            help.options
+            "Usage: pxv [args] image-file",
+            "Size",
+            help.options[_opt..(_opt += 3)],
+            "Colors",
+            help.options[_opt..(_opt += 3)],
+            "Misc",
+            help.options[_opt..(_opt += 4)],
         );
         return 0;
     }
 
-    string[] opts = args.dup;
-    opts.popFront();
-
-    // checking filepath
-    string filepath = opts.join.fixPath;
-
-    if (!filepath.exists()) {
-        writeln("No such file");
-        return 2;
+    if (conf.lowres && conf.hideBackground && !conf.useAscii) {
+        conf.hideBackground = false;
     }
 
-    // image loading routine
-    SuperImage img;
-    try {
-        img = loadImage(filepath);
-    } catch (Exception) {
-        writeln("Cannot open image");
-        return 2;
-    }
-    
-    int width = img.width;
-    int height = img.height;
+    string[] opts = args[1..$];
 
-    winsize w;
-    ioctl(0, TIOCGWINSZ, &w);
-    int terminalWidth = w.ws_col;
+    foreach (opt; opts) {
+        // checking filepath
+        string filepath = opt.fixPath;
 
-    if (cwidth != 0) {
-        terminalWidth = cwidth;
-    }
-    terminalWidth = max(min(terminalWidth, w.ws_col), 0);
-
-    if (cpalette != "") {
-        brightChars = cpalette;
-    }
-
-
-    const float yfix = 1.75;
-    const int rate = width / terminalWidth;
-    const int terminalHeight = to!int(floor((height / rate) / yfix));
-
-    for (int y = 0; y < terminalHeight; ++y) {
-        for (int x = 0; x < terminalWidth; ++x) {
-            int xpos = fClampToInt(fFloor(x * rate), 0, width);
-            int ypos = fClampToInt(fFloor(y * rate * yfix), 0, height);
-            int wpos = fClampToInt(fFloor(x + 1) * rate, 0, width) - xpos;
-            int hpos = fClampToInt(fFloor(y + 1) * rate * yfix, 0, height) - ypos;
-            
-            auto pix = img.opIndex(fFloorToInt(xpos + wpos / 2), fFloorToInt(ypos + hpos / 2));
-            Color mainCol = new Color(pix.r, pix.g, pix.b);
-            Color avgCol = getAvgColor(img, new Vector2i(xpos, ypos), new Vector2i(wpos, hpos));
-            writef("%s%s%s", getColTokenBack(avgCol), getColToken(mainCol), getChar(mainCol));
+        if (!filepath.exists()) {
+            writefln("No file: \'%s\'.", filepath);
+            continue;
         }
-        writeln(eolColToken);
+
+        STBImage stbimg;
+        try {
+            stbimg = new STBImage(filepath);
+        } catch (Exception e) {
+            writeln(e.msg);
+            continue;
+        }
+        Image img = Image(stbimg.opSlice(), stbimg.w, stbimg.h);
+
+        int trows = terminalHeight();
+        int tcolumns = terminalWidth();
+
+        float ratio = img.h / 1.0f / img.w;
+
+        bool isMatchingHeight = false;
+
+        if (conf.width != 0) {
+            tcolumns = conf.width;
+        }
+
+        if (conf.height != 0) {
+            trows = conf.height;
+            isMatchingHeight = (conf.width == 0 ? true : false);
+        }
+
+        trows *= 2;
+
+        isMatchingHeight = (isMatchingHeight || conf.size == MatchSize.height) && !conf.size == MatchSize.width;
+
+        if (conf.size == MatchSize.fit) {
+            int th = terminalHeight() * 2;
+            int tw = terminalWidth();
+            int ih = img.h;
+            int iw = img.w;
+            if (th > tw) { // terminal tall
+                if (ih > iw) { // image tall
+                    isMatchingHeight = true;
+                } else {
+                    isMatchingHeight = false;
+                }
+            } else { // terminal wide
+                isMatchingHeight = true;
+                // if (ih > iw) {
+                //     isMatchingHeight = true;
+                // } else {
+                // }
+            }
+        }
+        
+        if (isMatchingHeight && conf.width == 0) {
+            tcolumns = to!int(trows / ratio);
+        } else 
+        if (conf.height == 0) {
+            trows = to!int(tcolumns * ratio);
+        }
+
+        if (conf.asciiPalette != "") {
+            brightChars = conf.asciiPalette;
+        }
+
+        img.resizeImage(tcolumns, trows);
+
+        // int width = img.w;
+        int height = img.h;
+
+        for (int y = 0; y < trows / 2; ++y) {
+            for (int x = 0; x < tcolumns / (conf.lowres ? 2 : 1); ++x) {
+
+                Pixel upperPix = img.opIndex(x * (conf.lowres ? 2 : 1), y * 2);
+                Color upperCol = upperPix.pixelColor();
+                if (conf.grayscale) upperCol = Color(upperCol.luminance);
+                if (!conf.lowres) {
+                    if (y * 2 < height - 1) {
+                        Pixel lowerPix = img.opIndex(x, y * 2 + 1);
+                        Color lowerCol = lowerPix.pixelColor();
+                        if (conf.grayscale) lowerCol = Color(lowerCol.luminance);
+
+                        if (upperPix.transparent) {
+                            if (lowerPix.transparent) {
+                                write(FR.fullreset ~ " ");
+                            } else {
+                                if (conf.useAscii) {
+                                    char c = lowerCol.getChar();
+                                    writePixel!true(BG.reset, lowerCol, [c]);
+                                } else {
+                                    writePixel!false(BG.reset, lowerCol, lowerBlock);
+                                }
+                            }
+                        } else { // upperPix.transparent
+                            if (lowerPix.transparent) {
+                                if (conf.useAscii) {
+                                    writePixel!true(upperCol, FG.reset, " ");
+                                } else {
+                                    writePixel!false(BG.reset, upperCol, upperBlock);
+                                }
+                            } else {
+                                if (conf.useAscii) {
+                                    char c = lowerCol.getChar();
+                                    writePixel(upperCol, lowerCol, [c]);
+                                } else {
+                                    writePixel(upperCol, lowerCol, lowerBlock);
+                                }
+                            }
+                        }
+                    } else { // y * 2 < height - 1
+                        if (upperPix.transparent) {
+                            write(FR.fullreset ~ " ");
+                        } else {
+                            if (conf.useAscii) {
+                                writePixel!true(upperCol, FG.reset, " ");
+                            } else {
+                                writePixel!false(BG.reset, upperCol, upperBlock);
+                            }
+                        }
+                    }
+                } else { // chalf
+                    if (y * 2 < height - 1) {
+                        Pixel lowerPix = img.opIndex(x * 2, y * 2 + 1);
+                        Color lowerCol = lowerPix.pixelColor();
+                        if (conf.grayscale) lowerCol = Color(lowerCol.luminance);
+
+                        if (upperPix.transparent) {
+                            if (lowerPix.transparent) {
+                                write(FR.fullreset ~ "  ");
+                            } else {
+                                if (conf.useAscii) {
+                                    char c = lowerCol.getChar();
+                                    writePixel!true(BG.reset, lowerCol, [c, c]);
+                                } else {
+                                    writePixel!false(BG.reset, lowerCol, "  ");
+                                }
+                            }
+                        } else { // upperPix.transparent
+                            if (lowerPix.transparent) {
+                                if (conf.useAscii) {
+                                    writePixel!true(upperCol, FG.reset, "  ");
+                                } else {
+                                    writePixel!false(BG.reset, upperCol, "  ");
+                                }
+                            } else {
+                                if (conf.useAscii) {
+                                    char c = lowerCol.getChar();
+                                    writePixel(upperCol, lowerCol, [c, c]);
+                                } else {
+                                    writePixel(upperCol, lowerCol, "  ");
+                                }
+                            }
+                        }
+                    } else { // y * 2 < height - 1
+                        if (upperPix.transparent) {
+                            write(FR.fullreset ~ " ");
+                        } else {
+                            if (conf.useAscii) {
+                                writePixel!true(upperCol, FG.reset, "  ");
+                            } else {
+                                writePixel!true(BG.reset, upperCol, "  ");
+                            }
+                        }
+                    }
+                }
+                
+            }
+            writeln(eolColToken);
+        }
+        // next image
+        
     }
 
     // success
     return 0;
 }
 
-Color getAvgColor(SuperImage img, Vector2i stPos, Vector2i whPos) {
-    Color col = Color.WHITE;
+void writePixel(bool fgOnly = false)(BG bg, Color fg, string c) {
+    if (fgOnly || !conf.hideBackground) {
+        if (conf.color == ColorType.ansi8)
+            write(fg.toAnsi8String() ~ c);
+        else if (conf.color == ColorType.truecolor)
+            write(fg.toTrueColorString() ~ c);
+        else
+            write(fg.toAnsiString() ~ c);
+    } else {
+        if (conf.color == ColorType.ansi8)
+            write(bg ~ fg.toAnsi8String() ~ c);
+        else if (conf.color == ColorType.truecolor)
+            write(bg ~ fg.toTrueColorString() ~ c);
+        else
+            write(bg ~ fg.toAnsiString() ~ c);
+    }
+}
 
-    for (int y = stPos.y; y < stPos.y + whPos.y; ++y) {
-        for (int x = stPos.x; x < stPos.x + whPos.x; ++x) {
-            auto pix = img.opIndex(x, y);
-            Color c = new Color(pix.r, pix.g, pix.b);
-            col.r += c.r;
-            col.g += c.g;
-            col.b += c.b;
+void writePixel(bool bgOnly = false)(Color bg, FG fg, string c) {
+    if (conf.hideBackground) {
+        write(c);
+        return;
+    }
+    if (bgOnly) {
+        if (conf.color == ColorType.ansi8)
+            write(bg.toAnsi8String(true) ~ c);
+        else if (conf.color == ColorType.truecolor)
+            write(bg.toTrueColorString(true) ~ c);
+        else
+            write(bg.toAnsiString(true) ~ c);
+    } else {
+        if (conf.color == ColorType.ansi8)
+            write(fg ~ bg.toAnsi8String(true) ~ c);
+        else if (conf.color == ColorType.truecolor)
+            write(fg ~ bg.toTrueColorString(true) ~ c);
+        else
+            write(fg ~ bg.toAnsiString(true) ~ c);
+    }
+}
+
+void writePixel(Color bg, Color fg, string c) {
+    if (!conf.hideBackground) {
+        if (conf.color == ColorType.ansi8)
+            write(bg.toAnsi8String(true) ~ fg.toAnsi8String() ~ c);
+        else if (conf.color == ColorType.truecolor)
+            write(bg.toTrueColorString(true) ~ fg.toTrueColorString() ~ c);
+        else
+            write(bg.toAnsiString(true) ~ fg.toAnsiString() ~ c);
+    } else {
+        if (conf.color == ColorType.ansi8)
+            write(fg.toAnsi8String() ~ c);
+        else if (conf.color == ColorType.truecolor)
+            write(fg.toTrueColorString() ~ c);
+        else
+            write(fg.toAnsiString() ~ c);
+    }
+}
+
+struct Image {
+    Pixel[] data;
+    uint w;
+    uint h;
+}
+
+Pixel opIndex(Image img, ulong x, ulong y) {
+    return img.data[y * img.w + x];
+}
+
+Color pixelColor(Pixel p) {
+    return Color(p.r / 255.0, p.g / 255.0, p.b / 255.0);
+}
+
+void resizeImage(ref Image img, uint newWitdth, uint newHeight) {
+    uint imgw = img.w;
+    uint imgh = img.h;
+    
+    uint w = newWitdth;
+    uint h = newHeight;
+    import sily.array: fill;
+
+    Pixel[] pix = new Pixel[](newWitdth * newHeight);
+    float xsc = imgw.to!float / w / 1f;
+    float ysc = imgh.to!float / h / 1f;
+    uint xsci = max(1, cast(int) (imgw / w / 1f));
+    uint ysci = max(1, cast(int) (imgh / h / 1f));
+    uint wh = xsci * ysci;
+
+    for (uint y = 0; y < h; ++y) {
+        for (uint x = 0; x < w; ++x) {
+            uint r = 0;
+            uint g = 0;
+            uint b = 0;
+            uint a = 0;
+            
+            uint srcx = cast(int) (xsc * x);
+            uint srcy = cast(int) (ysc * y);
+            for (uint yi = 0; yi < ysci; ++yi) {
+                for (uint xi = 0; xi < xsci; ++xi) {
+                    ulong ipos = ((srcy + yi) * imgw + srcx + xi);
+
+                    r += img.data[ipos].r;
+                    g += img.data[ipos].g;
+                    b += img.data[ipos].b;
+                    a += img.data[ipos].a;
+                }
+            }
+            uint pos = (y * w + x);
+            
+            pix[pos].r = to!ubyte(r / wh); 
+            pix[pos].g = to!ubyte(g / wh);
+            pix[pos].b = to!ubyte(b / wh);
+            pix[pos].a = to!ubyte(a / wh);
+            
         }
     }
 
-    col.r /= whPos.x * whPos.y;
-    col.g /= whPos.x * whPos.y;
-    col.b /= whPos.x * whPos.y;
-    
-    return col.clamped();
+    img.w = w;
+    img.h = h;
+    img.data = pix;
 }
 
-char getChar(Color col) {
-    // int p = fFloorToInt((1 - col.getLuma()) * (to!int(brightChars.length) - 1));
-    int p = fFloorToInt((col.getLuma()) * (to!int(brightChars.length) - 1));
+bool transparent(Pixel p) {
+    return p.a < alphaThreshold;
+}
+
+char getChar(Color _col) {
+    int maxPos = brightChars.length.to!int - 1;
+    int p = clamp( _col.luminance() * maxPos, 0, maxPos).to!int;
     return brightChars[p];
-}
-
-string getColToken8(string ansi) {
-    return format("\033[%sm", ansi);
-}
-
-string getColToken(string ansi) {
-    return format("\033[38;5;%sm", ansi);
-}
-
-string getColToken(Color col) {
-    return format("\033[38;2;%s;%s;%sm", 
-                    to!string(floor(col.r * 255)), 
-                    to!string(floor(col.g * 255)), 
-                    to!string(floor(col.b * 255)));
-}
-
-string getColTokenBack(string ansi) {
-    return format("\033[48;5;%sm", ansi);
-}
-
-string getColTokenBack(Color col) {
-    return format("\033[48;2;%s;%s;%sm", 
-                    to!string(floor(col.r * 255)), 
-                    to!string(floor(col.g * 255)), 
-                    to!string(floor(col.b * 255)));
 }

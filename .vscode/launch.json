@@ -9,9 +9,9 @@
             "request": "launch",
             "name": "Debug D project",
             "cwd": "${workspaceFolder}",
-            "program": "./bin/craftascii",
+            "program": "./bin/pxv",
             "preLaunchTask": "fbuild",
-            "args": ["~/git/craftascii/test/gits_sitting.jpg"]
+            "args": ["~/git/pxv/test/gits_sitting.jpg"]
         }
     ]
 }

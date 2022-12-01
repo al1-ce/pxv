@@ -1,0 +1,22 @@
+name "pxv"
+description "Instant feature rich terminal image viewer"
+authors "Alisa Lain"
+copyright "Copyright © 2022, Alisa Lain"
+license "MIT"
+dependency "sily" version="~>1.2.0"
+targetType "executable"
+targetPath "./bin/"
+targetName "pxv"
+sourcePaths "src"
+lflags "$PACKAGE_DIR/lib/clibstb.a" platform="linux"
+configuration "default" {
+	targetType "executable"
+	targetPath "./bin"
+	targetName "pxv"
+}
+configuration "install" {
+	targetType "executable"
+	targetPath "./bin"
+	targetName "pxv"
+	postBuildCommands "echo Copying binary to /usr/bin && sudo mv ./bin/pxv /usr/bin/pxv"
+}
