@@ -40,14 +40,29 @@ Compilation of this repository requires [dlang](https://dlang.org).
 | :- | :- | :- |
 | -c, --columns | Sets width/columns. | Can be used together with `-r` to set custom image size |
 | -r, --rows | Sets height/rows. | If `-c` and `-m` are not set will change `-m` to `height` |
-| -s, --size | Matches set dimention. Must be one of: width, height, fit. | Fit option will fit image automatically. Defaults to width.
+| -s, --size | Matches set dimention. Must be one of: width, height, fit. | Fit option will fit image automatically. Defaults to width. Gifs are always matching to fit
 | -C, --color | Sets color type. Must be one of: ansi8, ansi256, truecolor. | ansi8 prints with `\e[$1m`, ansi256 with `\e[38;5;$1m` and truecolor with `\e[38;2;$1m` |
 | -g, --grayscale | Prints image in grayscale. | Keeps `-C` palette. |
 | -l, --lowres | Renders image in half of resolution. | Must be turned on if your terminal doesn't have support for unicode since by default pxv prints with "▀" and "▄". |
 | -i, --ascii | Uses ascii palette. | Default palette is `` .`^,:;!-~=+<>[]{}*JS?AX#%@`` |
 | -p, --palette | Sets ascii palette for output. | Works only with `-i` flag. |
 | -b, --background | Disables background. | Does not work when using `-l` without `-i`. |
-| -u, --unicode | Uses unicode to mimic image as much as possible. | Inspired by [tiv](https://github.com/stefanhaustein/TerminalImageViewer) and [playscii](http://vectorpoem.com/playscii/) |
+| -o, --once | If image is gif and flag is set then it's going to do only one loop |  |
+| -S, --still | Shows only first frame in gif | Marks image as not gif |
+| -f, --frame | Shows only N frame in gif | Marks image as not gif |
+<!-- | -u, --unicode | Uses unicode to mimic image as much as possible. | Inspired by [tiv](https://github.com/stefanhaustein/TerminalImageViewer) and [playscii](http://vectorpoem.com/playscii/) | -->
 
 ### Screenshots
-Todo
+#### Truecolor
+![](readme/truecolor.png)
+#### Ansi256
+![](readme/ansi256.png)
+#### Ansi8
+![](readme/ansi8.png)
+#### TrueColor + Ascii
+![](readme/trueascii.png)
+#### Ascii + NoBackground
+![](readme/ascii.png)
+
+#### GIFs (excuse compression artifacts)
+![](readme/smuggif.gif)

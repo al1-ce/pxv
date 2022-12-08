@@ -2,23 +2,20 @@ module stb.image.binding;
 
 import core.stdc.stdio : FILE;
 
-
-enum
-{
-	STBI_default,
-	STBI_grey,
-	STBI_grey_alpha,
-	STBI_rgb,
-	STBI_rgb_alpha
+enum {
+    STBI_default,
+    STBI_grey,
+    STBI_grey_alpha,
+    STBI_rgb,
+    STBI_rgb_alpha
 }
 
-extern(C) @nogc nothrow:
+extern (C) @nogc nothrow:
 
-struct stbi_io_callbacks
-{
-	int function(void* user, char* data, int size) read;
-	void function(void* user, int n) skip;
-	int function(void* user) eof;
+struct stbi_io_callbacks {
+    int function(void* user, char* data, int size) read;
+    void function(void* user, int n) skip;
+    int function(void* user) eof;
 }
 
 ubyte* stbi_load_from_memory(in void* buffer, int len, int* x, int* y, int* channels_in_file, int desired_channels);

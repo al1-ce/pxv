@@ -1,0 +1,89 @@
+#!/usr/bin/env dub
+/+ dub.sdl:
+name "stdtest"
+dependency "sily" version="~master"
++/
+
+/// logger.d
+
+/// main.d
+
+import std.stdio: writef, readln;
+import core.thread: Thread;
+import core.time: seconds;
+
+import sily.logger;
+import sily.terminal;
+
+void main() {
+
+    log("Testing normal log");
+    log("LogLevel: off");
+    globalLogLevel = LogLevel.off;
+    log("Should not see");
+    globalLogLevel = LogLevel.all;
+    log("LogLevel: all");
+    globalLogLevel = LogLevel.trace;
+    log("LogLevel: trace");
+    log!(LogLevel.info)("Should not see info");
+    log("LogLevel: error");
+    globalLogLevel = LogLevel.error;
+    log("LogLevel: all");
+    log!(LogLevel.fatal)("Should not see fatal");
+    globalLogLevel = LogLevel.all;
+
+
+    // writef("\033[2J");
+    // writef("\033[H");
+    trace("Trace state");
+    trace(`private string formatString(A...)(A args) {
+    string out_ = "";
+    foreach (arg; args) {
+        out_ ~= arg.to!string;
+    }
+    return out_;
+}`);
+    trace("It even preserves code\n");
+    info("Short info message");
+    info("This logger also supports multiline text alongside with wrapping it while " ~ 
+                        "preserving words as is\nAnd this one is after \\n");
+    info("Info ", "message split", " into many", " substrings\n");
+    warning("Warning message, beware\n");
+    error("Any errors that might come up while execution");
+    critical("Critical error. Need attention but not fatal");
+    fatal("This is error that's going to crash you program");
+
+    // int key;
+    // writef("Press key: ");
+    // setConioTerminalMode();
+    
+    // // fflush(stdout.getFP);
+    // bool quit = false;
+    // int i = 0;
+    // while (!quit) {
+    //     while (kbhit()) {
+    //         ++i;
+    //         key = getch();
+
+    //         if (key == 17) { // C-q
+    //             writef(" %c ", cast(char) key);
+    //             writef("\n\r");
+    //             quit = true; 
+    //             // log("Exit");
+    //             break;
+    //         // } else {
+    //         } else if (key >= 20) {
+    //             // writef(" %d ", key);
+    //             writef(" %c ", cast(char) key);
+    //         } else {
+    //             writef(" %d ", key);
+    //         }
+    //     }
+    //     if (i != 0 && !quit) writef(" %d ", i);
+    //     i = 0;
+    // }
+
+    // // log("Resetting term mode");
+    // resetTerminalMode();
+    // log(LogLevel.critical, "Term mode reset");
+}

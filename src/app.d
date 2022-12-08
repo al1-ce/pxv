@@ -11,19 +11,23 @@ import std.traits : isPointer;
 import std.array: popFront, join, split;
 import std.path: buildNormalizedPath, absolutePath, expandTilde;
 
+import core.thread: Thread;
+import core.time: msecs;
+import core.sys.posix.signal;
+import core.stdc.stdlib: exit;
+import core.stdc.stdio: printf;
+
 import stb.image: STBImage = Image;
 import stb.image: Pixel = Color;
 
 import sily.color;
 import sily.bashfmt;
 import sily.getopt;
-import sily.vector: vec2i;
+import sily.vector: ivec2;
 import sily.terminal;
 
 // cls && /g/pxv/bin/pxv ~/Pictures/20407219.png ~/Pictures/roofline-girl-1s-3840x2400.jpg ~/Pictures/anime-wallpaper.jpg
 // cls && ./bin/pxv ~/Pictures/20407219.png 
-
-const string eolColToken = "\033[0m";
 
 string brightChars = r" .`^,:;!-~=+<>[]{}*JS?AX#%@";
 
@@ -40,7 +44,7 @@ string upperBlock = "\u2580";
 string lowerBlock = "\u2584";
 
 enum MatchSize {
-    width, height, fit
+    none, width, height, fit
 }
 
 enum ColorType {
@@ -50,7 +54,7 @@ enum ColorType {
 struct Config {
     int width = 0;
     int height = 0;
-    MatchSize size = MatchSize.width;
+    MatchSize size = MatchSize.none;
     ColorType color = ColorType.ansi256;
     bool grayscale = false;
     bool lowres = false;
@@ -58,13 +62,23 @@ struct Config {
     string asciiPalette = "";
     bool hideBackground = false;
     bool useUnicode = false;
-
+    bool loopOnce = false;
+    bool still = false;
+    int frame = -1;
 }
 
 private Config conf;
 
-int main(string[] args) {
+extern(C) void handler(int num) nothrow @nogc @system {
+    printf("\033[m\033[?25h\n");
+    exit(num);
+}
 
+int main(string[] args) {
+    signal(SIGINT, &handler);
+    // FIXME: size works incorrectly
+    // FIXME: --once flag doesnt work
+    // FIXME: too much flicker
     GetoptResult help;
     try {
         help = getopt(
@@ -81,7 +95,10 @@ int main(string[] args) {
             "ascii|i", "Uses ascii palette", &conf.useAscii,
             "palette|p", "Sets ascii palette for output", &conf.asciiPalette,
             "background|b", "Disables background", &conf.hideBackground,
-            "unicode|u", "Uses unicode to mimic image as much as possible", &conf.useUnicode,
+            // "unicode|u", "Uses unicode to mimic image as much as possible", &conf.useUnicode,
+            "once|o", "If image is gif and flag is set then it's going to do only one loop", &conf.loopOnce,
+            "still|S", "Shows only first frame in gif", &conf.still,
+            "frame|f", "Shows only N frame in gif", &conf.frame
         );
     } catch (Exception e) {
         writeln(e.msg);
@@ -98,7 +115,7 @@ int main(string[] args) {
             "Colors",
             help.options[_opt..(_opt += 3)],
             "Misc",
-            help.options[_opt..(_opt += 4)],
+            help.options[_opt..(_opt += 6)],
         );
         return 0;
     }
@@ -125,7 +142,10 @@ int main(string[] args) {
             writeln(e.msg);
             continue;
         }
-        Image img = Image(stbimg.opSlice(), stbimg.w, stbimg.h);
+        Image img = Image(
+            stbimg.opSlice, stbimg.w, stbimg.h, 
+            stbimg.frames, cast(uint[]) (stbimg.delays[0..stbimg.frames]), 
+            stbimg.frames > 2);
 
         int trows = terminalHeight();
         int tcolumns = terminalWidth();
@@ -140,13 +160,15 @@ int main(string[] args) {
 
         if (conf.height != 0) {
             trows = conf.height;
-            isMatchingHeight = (conf.width == 0 ? true : false);
+            isMatchingHeight = true;
         }
 
-        trows *= 2;
+        if (img.isGif) { conf.size = MatchSize.fit; }
 
-        isMatchingHeight = (isMatchingHeight || conf.size == MatchSize.height) && !conf.size == MatchSize.width;
+        // trows *= 2;
 
+        if (conf.size == MatchSize.height) isMatchingHeight = true;
+        if (conf.size == MatchSize.width) isMatchingHeight = false;
         if (conf.size == MatchSize.fit) {
             int th = terminalHeight() * 2;
             int tw = terminalWidth();
@@ -168,143 +190,200 @@ int main(string[] args) {
         }
         
         if (isMatchingHeight && conf.width == 0) {
-            tcolumns = to!int(trows / ratio);
+            tcolumns = to!int(trows * 2 / ratio);
         } else 
         if (conf.height == 0) {
-            trows = to!int(tcolumns * ratio);
+            trows = to!int(tcolumns / 2 * ratio);
         }
 
         if (conf.asciiPalette != "") {
             brightChars = conf.asciiPalette;
         }
 
-        img.resizeImage(tcolumns, trows);
 
+        img.resizeImage(tcolumns, trows * 2);
+
+        // writefln("{%d, %d}", img.w, img.h);
         // int width = img.w;
         int height = img.h;
+        if (img.isGif) {
+            // screenEnableAltBuffer();
+        }
+        cursorHide();
 
-        for (int y = 0; y < trows / 2; ++y) {
-            for (int x = 0; x < tcolumns / (conf.lowres ? 2 : 1); ++x) {
+        int frame = 0;
 
-                Pixel upperPix = img.opIndex(x * (conf.lowres ? 2 : 1), y * 2);
-                Color upperCol = upperPix.pixelColor();
-                if (conf.grayscale) upperCol = Color(upperCol.luminance);
-                if (!conf.lowres) {
-                    if (y * 2 < height - 1) {
-                        Pixel lowerPix = img.opIndex(x, y * 2 + 1);
-                        Color lowerCol = lowerPix.pixelColor();
-                        if (conf.grayscale) lowerCol = Color(lowerCol.luminance);
+        if (conf.still) {
+            img.isGif = false;
+            img.frameCount = 1;
+        }
+        if (conf.frame != -1) {
+            frame = conf.frame;
+            img.isGif = false;
+            img.frameCount = frame + 1;
+        }
 
-                        if (upperPix.transparent) {
-                            if (lowerPix.transparent) {
-                                write(FR.fullreset ~ " ");
-                            } else {
-                                if (conf.useAscii) {
-                                    char c = lowerCol.getChar();
-                                    writePixel!true(BG.reset, lowerCol, [c]);
+        for (; frame < img.frameCount; ++frame) {
+            // fwrite(FR.fullreset);
+            cursorMoveTo(1);
+            for (int y = 0; y < trows; ++y) {
+                for (int x = 0; x < tcolumns / (conf.lowres ? 2 : 1); ++x) {
+
+                    Pixel upperPix = img.opIndex(x * (conf.lowres ? 2 : 1), y * 2, frame);
+                    Color upperCol = upperPix.pixelColor();
+                    if (conf.grayscale) upperCol = Color(upperCol.luminance);
+                    if (!conf.lowres) {
+                        if (y * 2 < height - 1) {
+                            Pixel lowerPix = img.opIndex(x, y * 2 + 1, frame);
+                            Color lowerCol = lowerPix.pixelColor();
+                            if (conf.grayscale) lowerCol = Color(lowerCol.luminance);
+
+                            if (upperPix.transparent) {
+                                if (lowerPix.transparent) {
+                                    write(FR.fullreset ~ " ");
                                 } else {
-                                    writePixel!false(BG.reset, lowerCol, lowerBlock);
+                                    if (conf.useAscii) {
+                                        char c = lowerCol.getChar();
+                                        writePixel!true(BG.reset, lowerCol, [c]);
+                                    } else {
+                                        writePixel!false(BG.reset, lowerCol, lowerBlock);
+                                    }
+                                }
+                            } else { // upperPix.transparent
+                                if (lowerPix.transparent) {
+                                    if (conf.useAscii) {
+                                        writePixel!true(upperCol, FG.reset, " ");
+                                    } else {
+                                        writePixel!false(BG.reset, upperCol, upperBlock);
+                                    }
+                                } else {
+                                    if (conf.useAscii) {
+                                        char c = lowerCol.getChar();
+                                        writePixel(upperCol, lowerCol, [c]);
+                                    } else {
+                                        writePixel(upperCol, lowerCol, lowerBlock);
+                                    }
                                 }
                             }
-                        } else { // upperPix.transparent
-                            if (lowerPix.transparent) {
+                        } else { // y * 2 < height - 1
+                            if (upperPix.transparent) {
+                                write(FR.fullreset ~ " ");
+                            } else {
                                 if (conf.useAscii) {
                                     writePixel!true(upperCol, FG.reset, " ");
                                 } else {
                                     writePixel!false(BG.reset, upperCol, upperBlock);
                                 }
-                            } else {
-                                if (conf.useAscii) {
-                                    char c = lowerCol.getChar();
-                                    writePixel(upperCol, lowerCol, [c]);
-                                } else {
-                                    writePixel(upperCol, lowerCol, lowerBlock);
-                                }
                             }
                         }
-                    } else { // y * 2 < height - 1
-                        if (upperPix.transparent) {
-                            write(FR.fullreset ~ " ");
-                        } else {
-                            if (conf.useAscii) {
-                                writePixel!true(upperCol, FG.reset, " ");
-                            } else {
-                                writePixel!false(BG.reset, upperCol, upperBlock);
-                            }
-                        }
-                    }
-                } else { // chalf
-                    if (y * 2 < height - 1) {
-                        Pixel lowerPix = img.opIndex(x * 2, y * 2 + 1);
-                        Color lowerCol = lowerPix.pixelColor();
-                        if (conf.grayscale) lowerCol = Color(lowerCol.luminance);
+                    } else { // chalf
+                        if (y * 2 < height - 1) {
+                            Pixel lowerPix = img.opIndex(x * 2, y * 2 + 1, frame);
+                            Color lowerCol = lowerPix.pixelColor();
+                            if (conf.grayscale) lowerCol = Color(lowerCol.luminance);
 
-                        if (upperPix.transparent) {
-                            if (lowerPix.transparent) {
-                                write(FR.fullreset ~ "  ");
-                            } else {
-                                if (conf.useAscii) {
-                                    char c = lowerCol.getChar();
-                                    writePixel!true(BG.reset, lowerCol, [c, c]);
+                            if (upperPix.transparent) {
+                                if (lowerPix.transparent) {
+                                    write(FR.fullreset ~ "  ");
                                 } else {
-                                    writePixel!false(BG.reset, lowerCol, "  ");
+                                    if (conf.useAscii) {
+                                        char c = lowerCol.getChar();
+                                        writePixel!true(BG.reset, lowerCol, [c, c]);
+                                    } else {
+                                        writePixel!false(BG.reset, lowerCol, "  ");
+                                    }
+                                }
+                            } else { // upperPix.transparent
+                                if (lowerPix.transparent) {
+                                    if (conf.useAscii) {
+                                        writePixel!true(upperCol, FG.reset, "  ");
+                                    } else {
+                                        writePixel!false(BG.reset, upperCol, "  ");
+                                    }
+                                } else {
+                                    if (conf.useAscii) {
+                                        char c = lowerCol.getChar();
+                                        writePixel(upperCol, lowerCol, [c, c]);
+                                    } else {
+                                        writePixel(upperCol, lowerCol, "  ");
+                                    }
                                 }
                             }
-                        } else { // upperPix.transparent
-                            if (lowerPix.transparent) {
+                        } else { // y * 2 < height - 1
+                            if (upperPix.transparent) {
+                                fwrite(FR.fullreset);
+                            } else {
                                 if (conf.useAscii) {
                                     writePixel!true(upperCol, FG.reset, "  ");
                                 } else {
-                                    writePixel!false(BG.reset, upperCol, "  ");
+                                    writePixel!true(BG.reset, upperCol, "  ");
                                 }
-                            } else {
-                                if (conf.useAscii) {
-                                    char c = lowerCol.getChar();
-                                    writePixel(upperCol, lowerCol, [c, c]);
-                                } else {
-                                    writePixel(upperCol, lowerCol, "  ");
-                                }
-                            }
-                        }
-                    } else { // y * 2 < height - 1
-                        if (upperPix.transparent) {
-                            write(FR.fullreset ~ " ");
-                        } else {
-                            if (conf.useAscii) {
-                                writePixel!true(upperCol, FG.reset, "  ");
-                            } else {
-                                writePixel!true(BG.reset, upperCol, "  ");
                             }
                         }
                     }
+                    
+                } // x
+                if (img.isGif && y == trows - 1) {
+                    fwrite(FR.fullreset);
+                } else {
+                    fwriteln(FR.fullreset);
                 }
-                
+            } // y
+
+            // is gif and not at end
+            if (img.isGif && frame < img.frameCount - 2) {
+                Thread.sleep(img.delays[frame].msecs);
+                eraseLines(img.h / 2 );
+                // moveCursorUp();
+            } else 
+            // is gif and at end and looping
+            // if (img.isGif && frame == img.frameCount - 1 && conf.loopOnce == false) {
+            if (frame == img.frameCount - 1) {
+                if (conf.loopOnce) {
+                    break;
+                } else 
+                if (img.isGif) {
+                    Thread.sleep(img.delays[frame].msecs);
+                    eraseLines(img.h / 2 );
+                    frame = 0;
+                }
+            } else {
+                break;
             }
-            writeln(eolColToken);
+
+        } // next frame
+
+        if (img.isGif) {
+            // screenDisableAltBuffer();
         }
-        // next image
-        
-    }
+        scope(exit) {
+            fwriteln(FR.fullreset);
+        }
+
+    } // next image
+
+    cursorShow();
 
     // success
     return 0;
 }
 
+
 void writePixel(bool fgOnly = false)(BG bg, Color fg, string c) {
     if (fgOnly || !conf.hideBackground) {
         if (conf.color == ColorType.ansi8)
-            write(fg.toAnsi8String() ~ c);
+            fwrite(fg.toAnsi8String(), c);
         else if (conf.color == ColorType.truecolor)
-            write(fg.toTrueColorString() ~ c);
+            fwrite(fg.toTrueColorString(), c);
         else
-            write(fg.toAnsiString() ~ c);
+            fwrite(fg.toAnsiString(), c);
     } else {
         if (conf.color == ColorType.ansi8)
-            write(bg ~ fg.toAnsi8String() ~ c);
+            fwrite(bg, fg.toAnsi8String(), c);
         else if (conf.color == ColorType.truecolor)
-            write(bg ~ fg.toTrueColorString() ~ c);
+            fwrite(bg, fg.toTrueColorString(), c);
         else
-            write(bg ~ fg.toAnsiString() ~ c);
+            fwrite(bg, fg.toAnsiString(), c);
     }
 }
 
@@ -315,36 +394,36 @@ void writePixel(bool bgOnly = false)(Color bg, FG fg, string c) {
     }
     if (bgOnly) {
         if (conf.color == ColorType.ansi8)
-            write(bg.toAnsi8String(true) ~ c);
+            fwrite(bg.toAnsi8String(true), c);
         else if (conf.color == ColorType.truecolor)
-            write(bg.toTrueColorString(true) ~ c);
+            fwrite(bg.toTrueColorString(true), c);
         else
-            write(bg.toAnsiString(true) ~ c);
+            fwrite(bg.toAnsiString(true), c);
     } else {
         if (conf.color == ColorType.ansi8)
-            write(fg ~ bg.toAnsi8String(true) ~ c);
+            fwrite(fg, bg.toAnsi8String(true), c);
         else if (conf.color == ColorType.truecolor)
-            write(fg ~ bg.toTrueColorString(true) ~ c);
+            fwrite(fg, bg.toTrueColorString(true), c);
         else
-            write(fg ~ bg.toAnsiString(true) ~ c);
+            fwrite(fg, bg.toAnsiString(true), c);
     }
 }
 
 void writePixel(Color bg, Color fg, string c) {
     if (!conf.hideBackground) {
         if (conf.color == ColorType.ansi8)
-            write(bg.toAnsi8String(true) ~ fg.toAnsi8String() ~ c);
+            fwrite(bg.toAnsi8String(true), fg.toAnsi8String(), c);
         else if (conf.color == ColorType.truecolor)
-            write(bg.toTrueColorString(true) ~ fg.toTrueColorString() ~ c);
+            fwrite(bg.toTrueColorString(true), fg.toTrueColorString(), c);
         else
-            write(bg.toAnsiString(true) ~ fg.toAnsiString() ~ c);
+            fwrite(bg.toAnsiString(true), fg.toAnsiString(), c);
     } else {
         if (conf.color == ColorType.ansi8)
-            write(fg.toAnsi8String() ~ c);
+            fwrite(fg.toAnsi8String(), c);
         else if (conf.color == ColorType.truecolor)
-            write(fg.toTrueColorString() ~ c);
+            fwrite(fg.toTrueColorString(), c);
         else
-            write(fg.toAnsiString() ~ c);
+            fwrite(fg.toAnsiString(), c);
     }
 }
 
@@ -352,57 +431,63 @@ struct Image {
     Pixel[] data;
     uint w;
     uint h;
+    uint frameCount;
+    uint[] delays;
+    bool isGif;
 }
 
-Pixel opIndex(Image img, ulong x, ulong y) {
+Pixel opIndex(Image img, uint x, uint y) {
     return img.data[y * img.w + x];
+}
+
+Pixel opIndex(Image img, uint x, uint y, uint frame) {
+    return img.data[y * img.w + x + frame * img.w * img.h];
 }
 
 Color pixelColor(Pixel p) {
     return Color(p.r / 255.0, p.g / 255.0, p.b / 255.0);
 }
 
-void resizeImage(ref Image img, uint newWitdth, uint newHeight) {
-    uint imgw = img.w;
-    uint imgh = img.h;
-    
+void resizeImage(ref Image img, uint newWitdth, uint newHeight) {    
     uint w = newWitdth;
     uint h = newHeight;
-    import sily.array: fill;
 
-    Pixel[] pix = new Pixel[](newWitdth * newHeight);
-    float xsc = imgw.to!float / w / 1f;
-    float ysc = imgh.to!float / h / 1f;
-    uint xsci = max(1, cast(int) (imgw / w / 1f));
-    uint ysci = max(1, cast(int) (imgh / h / 1f));
+    Pixel[] pix = new Pixel[](newWitdth * newHeight * img.frameCount);
+    float xsc = img.w.to!float / w / 1f;
+    float ysc = img.h.to!float / h / 1f;
+    uint xsci = max(1, cast(int) (img.w / w / 1f));
+    uint ysci = max(1, cast(int) (img.h / h / 1f));
     uint wh = xsci * ysci;
 
-    for (uint y = 0; y < h; ++y) {
-        for (uint x = 0; x < w; ++x) {
-            uint r = 0;
-            uint g = 0;
-            uint b = 0;
-            uint a = 0;
-            
-            uint srcx = cast(int) (xsc * x);
-            uint srcy = cast(int) (ysc * y);
-            for (uint yi = 0; yi < ysci; ++yi) {
-                for (uint xi = 0; xi < xsci; ++xi) {
-                    ulong ipos = ((srcy + yi) * imgw + srcx + xi);
+    for (uint f = 0; f < img.frameCount; ++f) {
+        ulong offset = f * img.w * img.h;
+        for (uint y = 0; y < h; ++y) {
+            for (uint x = 0; x < w; ++x) {
+                uint r = 0;
+                uint g = 0;
+                uint b = 0;
+                uint a = 0;
+                
+                uint srcx = cast(int) (xsc * x);
+                uint srcy = cast(int) (ysc * y);
+                for (uint yi = 0; yi < ysci; ++yi) {
+                    for (uint xi = 0; xi < xsci; ++xi) {
+                        ulong ipos = (srcy + yi) * img.w + srcx + xi + offset;
 
-                    r += img.data[ipos].r;
-                    g += img.data[ipos].g;
-                    b += img.data[ipos].b;
-                    a += img.data[ipos].a;
+                        r += img.data[ipos].r;
+                        g += img.data[ipos].g;
+                        b += img.data[ipos].b;
+                        a += img.data[ipos].a;
+                    }
                 }
+                uint pos = (y * w + x) + w * h * f;
+                
+                pix[pos].r = to!ubyte(r / wh); 
+                pix[pos].g = to!ubyte(g / wh);
+                pix[pos].b = to!ubyte(b / wh);
+                pix[pos].a = to!ubyte(a / wh);
+                
             }
-            uint pos = (y * w + x);
-            
-            pix[pos].r = to!ubyte(r / wh); 
-            pix[pos].g = to!ubyte(g / wh);
-            pix[pos].b = to!ubyte(b / wh);
-            pix[pos].a = to!ubyte(a / wh);
-            
         }
     }
 
