@@ -1,6 +1,7 @@
 {
 	"fileVersion": 1,
 	"versions": {
-		"sily": "1.2.6"
+		"sily": "1.2.7",
+		"speedy-stdio": "0.2.0"
 	}
 }

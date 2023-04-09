@@ -5,7 +5,6 @@ import std.format : format;
 import std.getopt;
 import std.math : floor;
 import std.range;
-import std.stdio : File, write, writef, writefln, writeln;
 import std.string : isNumeric;
 import std.traits : isPointer;
 import std.array: popFront, join, split;
@@ -25,6 +24,8 @@ import sily.bashfmt;
 import sily.getopt;
 import sily.vector: ivec2;
 import sily.terminal;
+import std.stdio: File;
+import speedy.stdio : write, writef, writefln, writeln;
 
 // cls && /g/pxv/bin/pxv ~/Pictures/20407219.png ~/Pictures/roofline-girl-1s-3840x2400.jpg ~/Pictures/anime-wallpaper.jpg
 // cls && ./bin/pxv ~/Pictures/20407219.png 
@@ -76,9 +77,7 @@ extern(C) void handler(int num) nothrow @nogc @system {
 
 int main(string[] args) {
     signal(SIGINT, &handler);
-    // FIXME: size works incorrectly
-    // FIXME: --once flag doesnt work
-    // FIXME: too much flicker
+    // FIXME: too much flicker, write into buffer and then write buffer itself
     GetoptResult help;
     try {
         help = getopt(
@@ -208,6 +207,7 @@ int main(string[] args) {
         int height = img.h;
         if (img.isGif) {
             // screenEnableAltBuffer();
+            // terminalModeSetRaw(false);
         }
         cursorHide();
 
@@ -328,6 +328,7 @@ int main(string[] args) {
                 } else {
                     fwriteln(FR.fullreset);
                 }
+                // if (img.isGif) cursorMoveTo(1);
             } // y
 
             // is gif and not at end
@@ -350,11 +351,13 @@ int main(string[] args) {
             } else {
                 break;
             }
+            // if (img.isGif) if (kbhit) { int g = getch(); if (g == 3 || g == 17) break; }
 
         } // next frame
 
         if (img.isGif) {
             // screenDisableAltBuffer();
+            // terminalModeReset();
         }
         scope(exit) {
             fwriteln(FR.fullreset);
