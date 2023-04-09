@@ -10,7 +10,7 @@ Instant feature rich terminal image viewer (as fast as [catimg](https://github.c
 ![git stars](https://badgen.net/github/stars/al1-ce/pxv?style=flat)
 ![status](https://img.shields.io/badge/status-⠀-success?style=flat-square)
 
-![](craftscii-screenshot.png)
+![](readme/truecolor.png)
 
 ## Installation
 
