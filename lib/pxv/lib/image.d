@@ -30,7 +30,7 @@ Image loadImageURL(string url) {
     import std.file: tempDir;
     import std.path: dirSeparator;
     download(url, tempDir ~ "pxv-tempFile");
-    writeln(tempDir ~ "pxv-tempFile");
+    // writeln(tempDir ~ "pxv-tempFile");
     return loadImage(tempDir ~ "pxv-tempFile");
     // STBImage stbimg;
     // HTTP http = HTTP();
