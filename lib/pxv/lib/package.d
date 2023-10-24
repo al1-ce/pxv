@@ -15,7 +15,7 @@ import sily.terminal;
 
 import pxv.lib.image;
 // cls && /g/pxv/bin/pxv ~/Pictures/20407219.png ~/Pictures/roofline-girl-1s-3840x2400.jpg ~/Pictures/anime-wallpaper.jpg
-// cls && ./bin/pxv ~/Pictures/20407219.png 
+// cls && ./bin/pxv ~/Pictures/20407219.png
 
 string brightChars = r" .`^,:;!-~=+<>[]{}*JS?AX#%@";
 
@@ -56,9 +56,10 @@ struct Config {
 Config conf;
 private string _out = "";
 
-string getImageString(Config conf, Image img) {
+string getImageString(Config p_conf, Image img) {
     _out = "";
-    
+    conf = p_conf;
+
     if (conf.lowres && conf.hideBackground && !conf.useAscii) {
         conf.hideBackground = false;
     }
@@ -70,8 +71,11 @@ string getImageString(Config conf, Image img) {
         brightChars = conf.asciiPalette;
     }
 
+    import std.conv: to;
+    writeln(conf.color.to!string);
+
     int height = img.h;
-    
+
     int frame = 0;
     // _out ~= "\033[?25l";
     if (conf.frame != -1 && conf.frame < img.frameCount) {
@@ -176,7 +180,7 @@ string getImageString(Config conf, Image img) {
                     }
                 }
             }
-            
+
         } // x
         if (img.isGif && y == trows - 1) {
             fwrite(FR.fullreset);

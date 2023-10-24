@@ -28,7 +28,7 @@ import pxv.lib;
 import pxv.lib.image;
 
 // cls && /g/pxv/bin/pxv ~/Pictures/20407219.png ~/Pictures/roofline-girl-1s-3840x2400.jpg ~/Pictures/anime-wallpaper.jpg
-// cls && ./bin/pxv ~/Pictures/20407219.png 
+// cls && ./bin/pxv ~/Pictures/20407219.png
 
 string fixPath(string p) {
     return p.expandTilde.absolutePath.buildNormalizedPath;
@@ -57,7 +57,7 @@ int main(string[] args) {
             "color|C", "Sets color type. Must be \'ansi8\', \'ansi256\', \'truecolor\'", &conf.color,
             "grayscale|g", "Renders image in grayscale", &conf.grayscale,
             "lowres|l", "Renders image in half of resolution", &conf.lowres,
-            
+
             "ascii|i", "Uses ascii palette", &conf.useAscii,
             "palette|p", "Sets ascii palette for output", &conf.asciiPalette,
             "background|b", "Disables background", &conf.hideBackground,
@@ -100,14 +100,14 @@ int main(string[] args) {
             writefln("No file: \'%s\'.", filepath);
             continue;
         }
-        
+
         Image img;
         if (isUrl) {
             img = loadImageURL(filepath);
         } else {
             img = loadImage(filepath);
         }
-        
+
         int trows = terminalHeight();
         int tcolumns = terminalWidth();
 
@@ -149,10 +149,10 @@ int main(string[] args) {
                 // }
             }
         }
-        
+
         if (isMatchingHeight && conf.width == 0) {
             tcolumns = to!int(trows * 2 / ratio);
-        } else 
+        } else
         if (conf.height == 0) {
             trows = to!int(tcolumns / 2 * ratio);
         }
@@ -192,13 +192,13 @@ int main(string[] args) {
                 Thread.sleep(img.delays[frame].msecs);
                 eraseLines(img.h / 2 );
                 // moveCursorUp();
-            } else 
+            } else
             // is gif and at end and looping
             // if (img.isGif && frame == img.frameCount - 1 && conf.loopOnce == false) {
             if (frame == img.frameCount - 2) {
                 if (conf.loopOnce) {
                     break;
-                } else 
+                } else
                 if (img.isGif) {
                     Thread.sleep(img.delays[frame].msecs);
                     eraseLines(img.h / 2 );
