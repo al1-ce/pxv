@@ -72,7 +72,7 @@ string getImageString(Config p_conf, Image img) {
     }
 
     import std.conv: to;
-    writeln(conf.color.to!string);
+    // writeln(conf.color.to!string);
 
     int height = img.h;
 

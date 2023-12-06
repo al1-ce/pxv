@@ -82,7 +82,7 @@ int main(string[] args) {
             "Colors",
             help.options[_opt..(_opt += 3)],
             "Misc",
-            help.options[_opt..(_opt += 6)],
+            help.options[_opt..(_opt += 7)],
         );
         return 0;
     }

@@ -8,8 +8,8 @@
 *.dll
 
 # Compiled Static libraries
-# *.a
-# *.lib
+*.a
+*.lib
 
 # Executables
 *.exe
