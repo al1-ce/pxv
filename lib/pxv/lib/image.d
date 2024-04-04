@@ -3,7 +3,11 @@ module pxv.lib.image;
 public import stb.image: STBImage = Image;
 public import stb.image: Pixel = Color;
 
-import std.stdio: writeln;
+version (Have_speedy_stdio)
+    import speedy.stdio: writeln;
+else
+    import std.stdio: writeln;
+
 import std.conv: to;
 import std.algorithm.comparison: max;
 
@@ -19,8 +23,8 @@ Image loadImage(string filepath) {
         exit(1);
     }
     Image img = Image(
-        stbimg.opSlice, stbimg.w, stbimg.h, 
-        stbimg.frames, cast(uint[]) (stbimg.delays[0..stbimg.frames]), 
+        stbimg.opSlice, stbimg.w, stbimg.h,
+        stbimg.frames, cast(uint[]) (stbimg.delays[0..stbimg.frames]),
         stbimg.frames > 2);
     return img;
 }
@@ -44,8 +48,8 @@ Image loadImageURL(string url) {
     //     exit(1);
     // }
     // Image img = Image(
-    //     stbimg.opSlice, stbimg.w, stbimg.h, 
-    //     stbimg.frames, cast(uint[]) (stbimg.delays[0..stbimg.frames]), 
+    //     stbimg.opSlice, stbimg.w, stbimg.h,
+    //     stbimg.frames, cast(uint[]) (stbimg.delays[0..stbimg.frames]),
     //     stbimg.frames > 2);
     // return img;
 }
@@ -68,7 +72,7 @@ Pixel opIndex(Image img, uint x, uint y, uint frame) {
     return img.data[y * img.w + x + frame * img.w * img.h];
 }
 
-void resizeImage(ref Image img, uint newWitdth, uint newHeight) {    
+void resizeImage(ref Image img, uint newWitdth, uint newHeight) {
     uint w = newWitdth;
     uint h = newHeight;
 
@@ -87,7 +91,7 @@ void resizeImage(ref Image img, uint newWitdth, uint newHeight) {
                 uint g = 0;
                 uint b = 0;
                 uint a = 0;
-                
+
                 uint srcx = cast(int) (xsc * x);
                 uint srcy = cast(int) (ysc * y);
                 for (uint yi = 0; yi < ysci; ++yi) {
@@ -101,12 +105,12 @@ void resizeImage(ref Image img, uint newWitdth, uint newHeight) {
                     }
                 }
                 uint pos = (y * w + x) + w * h * f;
-                
-                pix[pos].r = to!ubyte(r / wh); 
+
+                pix[pos].r = to!ubyte(r / wh);
                 pix[pos].g = to!ubyte(g / wh);
                 pix[pos].b = to!ubyte(b / wh);
                 pix[pos].a = to!ubyte(a / wh);
-                
+
             }
         }
     }

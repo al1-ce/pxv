@@ -17,17 +17,17 @@ import pxv.lib.image;
 // cls && /g/pxv/bin/pxv ~/Pictures/20407219.png ~/Pictures/roofline-girl-1s-3840x2400.jpg ~/Pictures/anime-wallpaper.jpg
 // cls && ./bin/pxv ~/Pictures/20407219.png
 
-string brightChars = r" .`^,:;!-~=+<>[]{}*JS?AX#%@";
+private string brightChars = r" .`^,:;!-~=+<>[]{}*JS?AX#%@";
 
-const int alphaThreshold = 64;
+private const int alphaThreshold = 64;
 
-alias fFloor = (T) => floor(to!float(T));
-alias fFloorToInt = (T) => to!int(fFloor(T));
-alias fClamp = (T, M, A) => clamp(to!float(T), to!float(M), to!float(A));
-alias fClampToInt = (T, M, A) => to!int(fClamp(T, M, A));
+private alias fFloor = (T) => floor(to!float(T));
+private alias fFloorToInt = (T) => to!int(fFloor(T));
+private alias fClamp = (T, M, A) => clamp(to!float(T), to!float(M), to!float(A));
+private alias fClampToInt = (T, M, A) => to!int(fClamp(T, M, A));
 
-string upperBlock = "\u2580";
-string lowerBlock = "\u2584";
+private string upperBlock = "\u2580";
+private string lowerBlock = "\u2584";
 
 enum MatchSize {
     none, width, height, fit
@@ -53,7 +53,7 @@ struct Config {
     int frame = -1;
 }
 
-Config conf;
+private Config conf;
 private string _out = "";
 
 string getImageString(Config p_conf, Image img) {
@@ -193,28 +193,28 @@ string getImageString(Config p_conf, Image img) {
     return _out;
 }
 
-void write(string t) {
+private void write(string t) {
     _out ~= t;
 }
 
-void writeln(string t) {
+private void writeln(string t) {
     _out ~= t ~ "\n";
 }
 
-void fwrite(A...)(A args) {
+private void fwrite(A...)(A args) {
     foreach (arg; args) {
         write(cast(string) arg);
     }
 }
 
-void fwriteln(A...)(A args) {
+private void fwriteln(A...)(A args) {
     foreach (arg; args) {
         write(cast(string) arg);
     }
     write("\n");
 }
 
-void writePixel(bool fgOnly = false)(BG bg, Color fg, string c) {
+private void writePixel(bool fgOnly = false)(BG bg, Color fg, string c) {
     if (fgOnly || !conf.hideBackground) {
         if (conf.color == ColorType.ansi8)
             fwrite(fg.toAnsi8String(), c);
@@ -232,7 +232,7 @@ void writePixel(bool fgOnly = false)(BG bg, Color fg, string c) {
     }
 }
 
-void writePixel(bool bgOnly = false)(Color bg, FG fg, string c) {
+private void writePixel(bool bgOnly = false)(Color bg, FG fg, string c) {
     if (conf.hideBackground) {
         write(c);
         return;
@@ -254,7 +254,7 @@ void writePixel(bool bgOnly = false)(Color bg, FG fg, string c) {
     }
 }
 
-void writePixel(Color bg, Color fg, string c) {
+private void writePixel(Color bg, Color fg, string c) {
     if (!conf.hideBackground) {
         if (conf.color == ColorType.ansi8)
             fwrite(bg.toAnsi8String(true), fg.toAnsi8String(), c);
@@ -272,12 +272,12 @@ void writePixel(Color bg, Color fg, string c) {
     }
 }
 
-Color pixelColor(Pixel p) {
+private Color pixelColor(Pixel p) {
     return Color(p.r / 255.0, p.g / 255.0, p.b / 255.0);
 }
 
 
-char getChar(Color _col) {
+private char getChar(Color _col) {
     int maxPos = brightChars.length.to!int - 1;
     int p = clamp( _col.luminance() * maxPos, 0, maxPos).to!int;
     return brightChars[p];

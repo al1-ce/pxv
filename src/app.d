@@ -22,7 +22,11 @@ import sily.getopt;
 import sily.vector: ivec2;
 import sily.terminal;
 import std.stdio: File;
-import speedy.stdio : write, writef, writefln, writeln;
+
+version (Have_speedy_stdio)
+    import speedy.stdio: write, writef, writefln, writeln;
+else
+    import std.stdio: write, writef, writefln, writeln;
 
 import pxv.lib;
 import pxv.lib.image;
@@ -211,7 +215,7 @@ int main(string[] args) {
 
         } // next frame
         scope(exit) {
-            sily.bashfmt.fwriteln(FR.fullreset);
+            // sily.bashfmt.fwriteln(FR.fullreset);
         }
         cursorShow();
 

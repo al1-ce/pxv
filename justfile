@@ -8,6 +8,12 @@ set positional-arguments
 build:
     @dub build
 
+release:
+    @dub build -b release
+
+dust status:
+    dub dustmite ../dustmite/pxv/ --compiler-status={{status}} -b=release --no-redirect
+
 # This is a default recipe
 # Tf "default" recipe is not there then
 # first recipe will be considered default
